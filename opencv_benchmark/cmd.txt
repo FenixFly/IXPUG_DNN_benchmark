@@ -1,0 +1,1 @@
+python3 opencv_benchmark.py -i ../datasets/imagenet/ -p ../models/squeezenet1.1.prototxt -m ../models/squeezenet1.1.caffemodel -ni 1000 -o true -of ./result/ -r result.csv -w 227 -he 227 -s 1.0
