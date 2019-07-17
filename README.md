@@ -1,6 +1,23 @@
 # IXPUG_DNN_benchmark
 Scripts for benchmarking dnn frameworks for IXPUG report
 
+Clone this repository to destination machine.
+
+## Get networks
+
+```bash
+ <openvino_dir>/bin/setupvars.sh
+ python3 <openvino_dir>/deployment_tools/tools/model_downloader/downloader.py -- name resnet-50
+ python3 <openvino_dir>/deployment_tools/tools/model_downloader/downloader.py -- name ssd300
+ 
+ python3 <openvino_dir>/deployment_tools/model_optimizer/mo.py --input_model <resnet50_folder>/resnet-50.caffemodel --input_proto <resnet50_folder>/resnet-50.prototxt 
+ 
+ python3 <openvino_dir>/deployment_tools/model_optimizer/mo.py --input_model <ssd300_folder>/ssd300.caffemodel --input_proto <ssd300_folder>/ssd300.prototxt 
+ 
+```
+
+## Prepare software
+
 
 The easiest way to avoid dependency hell is using seperate environments created by Conda. 
 
@@ -20,7 +37,6 @@ Next, activate environment
 Next, install framework and run benchmark.
 
 
-
 ## Caffe
 
 Variant 1. Install caffe from conda
@@ -31,14 +47,14 @@ Variant 1. Install caffe from conda
  conda install -c intel caffe
 ```
 
-### Start benchmark
+### Start benchmark classifiction
 
 ```bash
  conda activate caffe
  cd <IXPUG_DNN_benchmark>/caffe_benchmark
- python3 caffe_benchmark.py -i ../datasets/imagenet/ -p ../models/squeezenet1.1.prototxt -m ../models/squeezenet1.1.caffemodel -ni 1000 -o true -of ./result/ -r result.csv
+ mkdir result
+ python3 caffe_benchmark.py -i ../datasets/imagenet/ -p ../models/resnet-50.prototxt -m ../models/resnet-50.caffemodel -ni 1000 -o true -of ./result/ -r result.csv
 ```
-
 
 ## OpenCV
 
@@ -50,12 +66,13 @@ Variant 1. Install opencv from conda
  conda install -c conda-forge opencv
 ```
 
-### Start benchmark
+### Start benchmark classifiction
 
 ```bash
  conda activate opencv
  cd <IXPUG_DNN_benchmark>/opencv_benchmark
- python3 opencv_benchmark.py -i ../datasets/imagenet/ -p ../models/squeezenet1.1.prototxt -m ../models/squeezenet1.1.caffemodel -ni 1000 -o true -of ./result/ -r result.csv -w 227 -he 227 -s 1.0
+ mkdir result
+ python3 opencv_benchmark.py -i ../datasets/imagenet/ -p ../models/resnet-50.prototxt -m ../models/resnet-50.caffemodel -ni 1000 -o true -of ./result/ -r result.csv -w 224 -he 224
 ```
 
 
