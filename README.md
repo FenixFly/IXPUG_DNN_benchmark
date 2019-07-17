@@ -31,12 +31,13 @@ Variant 1. Install caffe from conda
  conda install -c intel caffe
 ```
 
-### Start benchmark
+### Start benchmark classifiction
 
 ```bash
  conda activate caffe
  cd <IXPUG_DNN_benchmark>/caffe_benchmark
- python3 caffe_benchmark.py -i ../datasets/imagenet/ -p ../models/squeezenet1.1.prototxt -m ../models/squeezenet1.1.caffemodel -ni 1000 -o true -of ./result/ -r result.csv
+ mkdir result
+ python3 caffe_benchmark.py -i ../datasets/imagenet/ -p ../models/resnet-50.prototxt -m ../models/resnet-50.caffemodel -ni 1000 -o true -of ./result/ -r result.csv
 ```
 
 
@@ -50,12 +51,13 @@ Variant 1. Install opencv from conda
  conda install -c conda-forge opencv
 ```
 
-### Start benchmark
+### Start benchmark classifiction
 
 ```bash
  conda activate opencv
  cd <IXPUG_DNN_benchmark>/opencv_benchmark
- python3 opencv_benchmark.py -i ../datasets/imagenet/ -p ../models/squeezenet1.1.prototxt -m ../models/squeezenet1.1.caffemodel -ni 1000 -o true -of ./result/ -r result.csv -w 227 -he 227 -s 1.0
+ mkdir result
+ python3 opencv_benchmark.py -i ../datasets/imagenet/ -p ../models/resnet-50.prototxt -m ../models/resnet-50.caffemodel -ni 1000 -o true -of ./result/ -r result.csv -w 224 -he 224
 ```
 
 
