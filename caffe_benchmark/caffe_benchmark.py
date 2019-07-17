@@ -8,7 +8,7 @@ Caffe classification benchmarking script
 Sample string to run benchmark: 
 
 cd IXPUG_DNN_benchmark/caffe_benchmark
-python3 caffe_benchmark.py -i ../datasets/imagenet/ -p ../models/squeezenet1.1.prototxt -m ../models/squeezenet1.1.caffemodel -ni 2 -o true -of ./result/ -r result.csv
+python3 caffe_benchmark.py -i ../datasets/imagenet/ -p ../models/resnet-50.prototxt -m ../models/resnet-50.caffemodel -ni 1000 -o true -of ./result/ -r result.csv
 
 Last modified 14.07.2019
 
@@ -89,10 +89,8 @@ def caffe_benchmark(net, transformer, number_iter, input_folder,
         inference_time.append(t1 - t0)
     return prob, inference_time
 
-
 def classification_output(prob, output_file):
     prob = prob[0,:,0,0]
-    top = np.argmax(prob)
     np.savetxt(output_file, prob)
 
 
