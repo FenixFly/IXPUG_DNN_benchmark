@@ -1,0 +1,2 @@
+Model;Batch size;Device;IterationCount;Thread num;Stream num; Average time (s); FPS;
+resnet-50.bin;1;CPU;100;4;4;5.750;17.391

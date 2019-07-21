@@ -8,8 +8,8 @@ OpenVINO classification benchmarking script
 Sample string to run benchmark: 
 
 cd IXPUG_DNN_benchmark/openvino_benchmark
-python3 openvino_benchmark_sync.py -i ../datasets/imagenet/ -c ../models/resnet-50.xml -m ../models/resnet-50.bin -ni 1000 -o True -of ./result/ -r result.csv -s 1.0 -w 224 -he 224 -tn 1 -sn 1 -b 1
-Last modified 17.07.2019
+python3 openvino_benchmark_async.py -i ../datasets/imagenet/ -c ../models/resnet-50.xml -m ../models/resnet-50.bin -ni 1000 -o True -of ./result/ -r result.csv -s 1.0 -w 224 -he 224 -tn 1 -sn 1 -b 1
+Last modified 21.07.2019
 
 """
 
@@ -19,6 +19,7 @@ import os.path
 import argparse
 import logging as log
 import numpy as np
+import copy
 from time import time
 from openvino.inference_engine import IENetwork, IEPlugin
 
@@ -46,7 +47,7 @@ def build_argparser():
         default='result.csv', type=str)
     parser.add_argument('-tn', '--thread_num', help='threads num', 
         required=True, type=int)
-    parser.add_argument('-sn', '--stream_num', help='stream num', 
+    parser.add_argument('-sn', '--stream_num', help='threads num', 
         required=True, type=int)
     parser.add_argument('-b', '--batch_size', help='batch size', 
         required=True, type=int)
@@ -119,9 +120,10 @@ def load_images(model, input_folder):
     return images
     
 
-def openvino_benchmark_sync(exec_net, net, number, batch_size, input_folder, 
+def openvino_benchmark_async(exec_net, net, number, batch_size, input_folder, 
                     need_output = False, output_folder = ''):
-    inference_time = []
+    curr_request_id = 0
+    prev_request_id  = 1
     input_blob = next(iter(net.inputs))
     out_blob = next(iter(net.outputs))
     filenames = os.listdir(input_folder)
@@ -129,79 +131,78 @@ def openvino_benchmark_sync(exec_net, net, number, batch_size, input_folder,
     images = load_images(net, input_folder)
     
     number_iter = (number + batch_size - 1) // batch_size
+    t0 = time()
+    first = True
+    res = []
     
     for i in range(number_iter):
-        
         
         a = (i * batch_size) % len(images) 
         b = (((i + 1) * batch_size - 1) % len(images)) + 1         
         
         im_batch = images[a : b:]
-        
+    
         if (a > b):
             im_batch = images[b : b+batch_size:]
+        infer_request_handle = exec_net.start_async(request_id = curr_request_id, 
+                                inputs = {input_blob : im_batch})
+        if first == True:
+            first = False
+            prev_request_id, curr_request_id = curr_request_id, prev_request_id
+            continue
         
-        t0 = time()
-        
-        preds = exec_net.infer(inputs = {input_blob : im_batch})
-        t1 = time()
-        
-        if (need_output):
-            preds = preds[out_blob]
-            
-            for k in range(a, b):
-                image_name = os.path.join(input_folder, filenames[k % filenames_size])
-                # Generate output name
-                output_filename = str(os.path.splitext(os.path.basename(image_name))[0])+'.npy'
-                output_filename = os.path.join(os.path.dirname(output_folder), output_filename) 
-                # Save output
-                classification_output(preds[k-a,:], output_filename)
-        inference_time.append(t1 - t0)
-    return preds, inference_time
-
+        if exec_net.requests[prev_request_id].wait(-1) == 0:
+            if need_output:
+                res.append(copy.copy(exec_net.requests[prev_request_id].
+                        outputs[next(iter(net.outputs))]))
+        prev_request_id, curr_request_id = curr_request_id, prev_request_id
+    if exec_net.requests[prev_request_id].wait(-1) == 0:
+        if need_output:
+            res.append(copy.copy(exec_net.requests[prev_request_id].
+                    outputs[next(iter(net.outputs))]))
+                
+    t1 = time()
+    inference_time = t1 - t0
+    
+    result = []
+    for r_l1 in res:
+        for r_l2 in r_l1:
+            result.append(r_l2)
+    res = np.asarray(result[0: len(images)])
+    
+    return res, inference_time
 
 def classification_output(prob, output_file):
     np.savetxt(output_file, prob)
-
-def three_sigma_rule(time):
-    average_time = np.mean(time)
-    sigm = np.std(time)
-    upper_bound = average_time + (3 * sigm)
-    lower_bound = average_time - (3 * sigm)
-    valid_time = []
-    for i in range(len(time)):
-        if lower_bound <= time[i] <= upper_bound:
-            valid_time.append(time[i])
-    return valid_time
-
-def calculate_average_time(time):
-    average_time = np.mean(time)
-    return average_time
-
-def calculate_latency(time):
-    time.sort()
-    latency = np.median(time)
-    return latency
-
-def calculate_fps(pictures, time):
-    return pictures / time
 
 def create_result_file(filename):
     if os.path.isfile(filename):
         return
     file = open(filename, 'w')
-    head = 'Model;Batch size;Device;IterationCount;Threads num;Streams num;Average time of single pass (s);Latency;FPS;'
+    head = 'Model;Batch size;Device;IterationCount;Thread num;Stream num; Average time (s); FPS;'
     file.write(head + '\n')
     file.close()
 
-def write_row(filename, net_name, number_iter, batch_size, thread_num, stream_num, average_time, latency, fps):
-    row = '{0};{1};CPU;{2};{3};{4};{5:.3f};{6:.3f};{7:.3f}'.format(
-            net_name, batch_size, number_iter, thread_num, stream_num,
-           average_time, latency, fps)
+def write_row(filename, net_name, number_iter, batch_size, thread_num, stream_num, average_time, fps):
+    row = '{0};{1};CPU;{2};{3};{4};{5:.3f};{6:.3f}'.format(net_name, batch_size, 
+           number_iter, thread_num, stream_num, average_time, fps)
     file = open(filename, 'a')
     file.write(row + '\n')
     file.close()
 
+def calculate_fps_async(pictures, time):
+    return pictures / time
+
+def save_preds(preds, input_folder, output_folder):
+    filenames = os.listdir(input_folder)
+    filenames_size = len(filenames)
+    
+    for i in range(preds.shape[0]):
+        image_name = os.path.join(input_folder, filenames[i % filenames_size])
+        output_filename = str(os.path.splitext(os.path.basename(image_name))[0])+'.npy'
+        output_filename = os.path.join(os.path.dirname(output_folder), output_filename) 
+        # Save output
+        classification_output(preds[i,:], output_filename)
 
 
 def main():
@@ -215,21 +216,22 @@ def main():
                                 ['CPU'], '', args.thread_num,
                                 args.stream_num)
     net.batch_size = args.batch_size
-    exec_net = plugin.load(network=net)
+    exec_net = plugin.load(network=net, num_requests = 2)
     
     # Execute network
-    pred, inference_time = openvino_benchmark_sync(exec_net, net, args.number_iter,
+    pred, inference_time = openvino_benchmark_async(exec_net, net, args.number_iter,
                                      args.batch_size, args.input_folder, args.output,
                                      args.output_folder)
     
-    # Write benchmark results
-    inference_time = three_sigma_rule(inference_time)
-    average_time = calculate_average_time(inference_time)
-    latency = calculate_latency(inference_time)
+    # Write prediction
+    if args.output:
+        save_preds(pred, args.input_folder, args.output_folder)
     
-    fps = calculate_fps(args.batch_size, latency)
+    
+    # Write benchmark results
+    fps = calculate_fps_async(args.number_iter, inference_time)
     write_row(args.result_file, os.path.basename(args.model), args.number_iter, 
-              args.batch_size, args.thread_num, args.stream_num, average_time, latency, fps)
+              args.batch_size, args.thread_num, args.stream_num, inference_time, fps)
     
     del exec_net
     del net
