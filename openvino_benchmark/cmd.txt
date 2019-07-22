@@ -1,4 +1,4 @@
-python3 openvino_benchmark_sync.py -i ../datasets/imagenet/ -c ../models/resnet-50.xml -m ../models/resnet-50.bin -ni 1000 -o True -of ./result_sync/ -r result_sync.csv -s 1.0 -w 224 -he 224 -tn 1 -sn 1 -b 1
+python3 openvino_benchmark_sync.py -i ../datasets/imagenet/ -c ../models/resnet-50.xml -m ../models/resnet-50.bin -ni 1000 -o False -of ./result_sync/ -r result_sync.csv -s 1.0 -w 224 -he 224 -tn 1 -sn 1 -b 1
 
 
-python3 openvino_benchmark_async.py -i ../datasets/imagenet/ -c ../models/resnet-50.xml -m ../models/resnet-50.bin -ni 1000 -o True -of ./result_async/ -r result_async.csv -s 1.0 -w 224 -he 224 -tn 1 -sn 1 -b 1
+python3 openvino_benchmark_async.py -i ../datasets/imagenet/ -c ../models/resnet-50.xml -m ../models/resnet-50.bin -ni 1000 -o False -of ./result_async/ -r result_async.csv -s 1.0 -w 224 -he 224 -tn 1 -sn 1 -b 1

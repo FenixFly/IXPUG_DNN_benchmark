@@ -85,13 +85,18 @@ def caffe_benchmark(net, transformer, number_iter, input_folder,
             output_filename = str(os.path.splitext(os.path.basename(image_name))[0])+'.npy'
             output_filename = os.path.join(os.path.dirname(output_folder), output_filename) 
             # Save output
+            detection_output(prob, output_filename)
             classification_output(prob, output_filename)
+            
         inference_time.append(t1 - t0)
     return prob, inference_time
 
 def classification_output(prob, output_file):
-    prob = prob[0,:,0,0]
+    prob = prob[0]
     np.savetxt(output_file, prob)
+
+def detection_output(prob, output_file):
+    print(prob.shape)
 
 
 def three_sigma_rule(time):
@@ -153,7 +158,6 @@ def main():
     fps = calculate_fps(1, latency)
     write_row(args.result_file, os.path.basename(args.model), args.number_iter, 
               average_time, latency, fps)
-
 
 if __name__ == '__main__':
     main()
