@@ -8,9 +8,9 @@ OpenCV classification benchmarking script
 Sample string to run benchmark: 
 
 cd IXPUG_DNN_benchmark/opencv_benchmark
-python3 opencv_benchmark.py -i ../datasets/imagenet/ -p ../models/squeezenet1.1.prototxt -m ../models/squeezenet1.1.caffemodel -ni 2 -o true -of ./result/ -r result.csv
+python3 opencv_benchmark.py -i ../datasets/imagenet/ -p ../models/resnet-50.prototxt -m ../models/resnet-50.caffemodel -ni 2 -o False -of ./result/ -r result.csv
 
-Last modified 15.07.2019
+Last modified 22.07.2019
 
 """
 
@@ -59,7 +59,7 @@ def opencv_benchmark(net, transformer, number_iter, input_folder,
     for i in range(number_iter):
         image_name = os.path.join(input_folder, filenames[i % filenames_size])
         image = cv2.imread(image_name)
-        blob = cv2.dnn.blobFromImage(image, 1, (227, 227), (0, 0, 0))
+        blob = cv2.dnn.blobFromImage(image, 1, (224, 224), (0, 0, 0))
         net.setInput(blob)
         
         
@@ -67,7 +67,7 @@ def opencv_benchmark(net, transformer, number_iter, input_folder,
         preds = net.forward()
         t1 = time()
         
-        if (need_output):
+        if (need_output == True):
             # Generate output name
             output_filename = str(os.path.splitext(os.path.basename(image_name))[0])+'.npy'
             output_filename = os.path.join(os.path.dirname(output_folder), output_filename) 
@@ -77,7 +77,7 @@ def opencv_benchmark(net, transformer, number_iter, input_folder,
     return preds, inference_time
 
 def classification_output(prob, output_file):
-    prob = prob[0,:,0,0]
+    prob = prob[0]
     np.savetxt(output_file, prob)
 
 def three_sigma_rule(time):
