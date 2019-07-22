@@ -164,6 +164,10 @@ def openvino_benchmark_async(exec_net, net, number, batch_size, input_folder,
     t1 = time()
     inference_time = t1 - t0
     
+        
+    perf_counts = infer_request_handle.get_perf_counts()
+    write_perf_rows(perf_counts, os.path.join(output_folder, 'perf_counts.txt'))
+    
     result = []
     for r_l1 in res:
         for r_l2 in r_l1:
@@ -204,6 +208,20 @@ def save_preds(preds, input_folder, output_folder):
         # Save output
         classification_output(preds[i,:], output_filename)
 
+def write_perf_rows(perf_counts, filename):
+    file = open(filename, 'a')
+    file.write('\n\n\n\n\n')
+    row = "{:<40} {:<15} {:<20} {:<15} {:<10}".format('name', 'layer_type', 'exet_type', 'status', 'real_time, us')
+    file.write(row + '\n')
+    for layer, stats in perf_counts.items():
+            row = "{:<40} {:<15} {:<20} {:<15} {:<10}".format(
+                    layer, 
+                    stats['layer_type'], 
+                    stats['exec_type'],
+                    stats['status'], 
+                    stats['real_time'])
+            file.write(row + '\n')
+    file.close()
 
 def main():
     args = build_argparser().parse_args()

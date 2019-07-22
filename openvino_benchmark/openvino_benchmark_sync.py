@@ -132,7 +132,6 @@ def openvino_benchmark_sync(exec_net, net, number, batch_size, input_folder,
     
     for i in range(number_iter):
         
-        
         a = (i * batch_size) % len(images) 
         b = (((i + 1) * batch_size - 1) % len(images)) + 1         
         
@@ -145,7 +144,6 @@ def openvino_benchmark_sync(exec_net, net, number, batch_size, input_folder,
         
         preds = exec_net.infer(inputs = {input_blob : im_batch})
         t1 = time()
-        
         if (need_output):
             preds = preds[out_blob]
             
@@ -157,6 +155,10 @@ def openvino_benchmark_sync(exec_net, net, number, batch_size, input_folder,
                 # Save output
                 classification_output(preds[k-a,:], output_filename)
         inference_time.append(t1 - t0)
+        
+    perf_counts = exec_net.requests[0].get_perf_counts()
+    write_perf_rows(perf_counts, os.path.join(output_folder, 'perf_counts.txt'))
+    
     return preds, inference_time
 
 
@@ -202,7 +204,20 @@ def write_row(filename, net_name, number_iter, batch_size, thread_num, stream_nu
     file.write(row + '\n')
     file.close()
 
-
+def write_perf_rows(perf_counts, filename):
+    file = open(filename, 'a')
+    file.write('\n\n\n\n\n')
+    row = "{:<40} {:<15} {:<20} {:<15} {:<10}".format('name', 'layer_type', 'exet_type', 'status', 'real_time, us')
+    file.write(row + '\n')
+    for layer, stats in perf_counts.items():
+            row = "{:<40} {:<15} {:<20} {:<15} {:<10}".format(
+                    layer, 
+                    stats['layer_type'], 
+                    stats['exec_type'],
+                    stats['status'], 
+                    stats['real_time'])
+            file.write(row + '\n')
+    file.close()
 
 def main():
     args = build_argparser().parse_args()

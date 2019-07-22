@@ -1,5 +1,0 @@
-Model;Batch size;Device;IterationCount;Threads num;Streams num;Average time of single pass (s);Latency;FPS;
-resnet-50.bin;1;CPU;100;1;1;0.111;0.110;9.083
-resnet-50.bin;4;CPU;100;4;4;0.437;0.437;9.147
-resnet-50.bin;2;CPU;100;4;4;0.221;0.221;9.044
-resnet-50.bin;2;CPU;100;2;2;0.221;0.221;9.043
