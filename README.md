@@ -52,8 +52,17 @@ Variant 1. Install caffe from conda
 ```bash
  conda activate caffe
  cd <IXPUG_DNN_benchmark>/caffe_benchmark
- mkdir result
- python3 caffe_benchmark.py -i ../datasets/imagenet/ -p ../models/resnet-50.prototxt -m ../models/resnet-50.caffemodel -ni 1000 -o False -of ./result/ -r result.csv
+ mkdir results_classification
+ python3 caffe_benchmark.py -t classification -i ../datasets/imagenet/ -p ../models/resnet-50.prototxt -m ../models/resnet-50.caffemodel -ni 1000 -o False -of ./results_classification/ -r ./results_classification/result.csv
+```
+
+### Start benchmark detection
+```bash
+ conda activate caffe
+ cd <IXPUG_DNN_benchmark>/caffe_benchmark
+ mkdir results_detection
+ python3 caffe_benchmark.py -t detection -i ../datasets/pascal_voc/ -p ../models/ssd300.prototxt -m ../models/ssd300.caffemodel -ni 1000 -o False -of ./results_detection/ -r ./results_detection/result.csv -me [104,117,123]
+ 
 ```
 
 ## OpenCV
@@ -79,6 +88,8 @@ Variant 1. Install opencv from conda
 
 Variant 1. Install from off. site
 
+### Optimization 
+To get better pefformance, try different `-tn`, `-sn`, and `-b` parameters, and set `-o` parameter (output) to `False`.
 
 ### Start benchmark classifiction
 
@@ -93,7 +104,15 @@ Variant 1. Install from off. site
  python3 openvino_benchmark_async.py -i ../datasets/imagenet/ -c ../models/resnet-50.xml -m ../models/resnet-50.bin -ni 1000 -o False -of ./result_async/ -r result_async.csv -s 1.0 -w 224 -he 224 -tn 1 -sn 1 -b 1
 ```
 
-To get better pefformance, try different `-tn`, `-sn`, and `-b` parameters, and set `-o` parameter (output) to `False`.
+### Start benchmark detection
 
+```bash
+ conda activate openvino
+ cd <IXPUG_DNN_benchmark>/openvino_benchmark
+ mkdir result_sync
+ mkdir result_async
+ 
+ python3 openvino_benchmark_sync.py -i ../datasets/imagenet/ -c ../models/ssd300.xml -m ../models/ssd300.bin -ni 1000 -o False -of ./result_sync/ -r result_sync.csv -s 1.0 -w 300 -he 300 -tn 1 -sn 1 -b 1
 
-
+ python3 openvino_benchmark_async.py -i ../datasets/imagenet/ -c ../models/ssd300.xml -m ../models/ssd300.bin -ni 1000 -o False -of ./result_async/ -r result_async.csv -s 1.0 -w 300 -he 300 -tn 1 -sn 1 -b 1
+```

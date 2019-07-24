@@ -8,9 +8,12 @@ Caffe classification benchmarking script
 Sample string to run benchmark: 
 
 cd IXPUG_DNN_benchmark/caffe_benchmark
-python3 caffe_benchmark.py -i ../datasets/imagenet/ -p ../models/resnet-50.prototxt -m ../models/resnet-50.caffemodel -ni 1000 -o true -of ./result/ -r result.csv
+mkdir results_classification
+mkdir results_detection
+python3 caffe_benchmark.py -t classification -i ../datasets/imagenet/ -p ../models/resnet-50.prototxt -m ../models/resnet-50.caffemodel -ni 1000 -o False -of ./results_classification/ -r ./results_classification/result.csv
+python3 caffe_benchmark.py -t detection -i ../datasets/pascal_voc/ -p ../models/ssd300.prototxt -m ../models/ssd300.caffemodel -ni 1000 -o False -of ./results_detection/ -r ./results_detection/result.csv -me [104,117,123]
 
-Last modified 14.07.2019
+Last modified 24.07.2019
 
 """
 
@@ -37,13 +40,15 @@ def build_argparser():
         default='', type=str)
     parser.add_argument('-r', '--result_file', help='Name of output folder', 
         default='result.csv', type=str)
-        
+    parser.add_argument('-t', '--task_type', help='Task type: \
+        classification / detection', default = 'classification', type=str)
+    parser.add_argument('-me', '--mean', help='Input mean values', 
+                        default = '[0 0 0]', type=str)
     return parser
 
 def load_network(proto, model):
     caffe.set_mode_cpu()
     network = caffe.Net(proto, model, caffe.TEST)
-    
     transformer = caffe.io.Transformer({'data': network.blobs['data'].data.shape})
     transformer.set_transpose('data', (2,0,1))
     transformer.set_channel_swap('data', (2,1,0))
@@ -52,21 +57,18 @@ def load_network(proto, model):
     return network, transformer
 
 def load_image_to_network(image_path, net, transformer):
-    
     im = caffe.io.load_image(image_path)
     net.blobs['data'].data[...] = transformer.preprocess('data', im)
 
 def prepare_image(image_path, input_dims, scale = 1.0, mean = [0.0, 0.0, 0.0]):
-    
     image = cv2.imread(image_path, 1).astype(np.float32) - np.asarray(mean)
     image = image * scale
     image_size = image.shape
     image = cv2.resize(image, (input_dims[2], input_dims[3]))
     return image, image_size
 
-
-def caffe_benchmark(net, transformer, number_iter, input_folder, 
-                    need_output = False, output_folder = ''):
+def caffe_benchmark(net, transformer, number_iter, input_folder,
+                    need_output = False, output_folder = '', task_type = ''):
     
     filenames = os.listdir(input_folder)
     filenames_size = len(filenames)
@@ -79,25 +81,27 @@ def caffe_benchmark(net, transformer, number_iter, input_folder,
         out = net.forward()
         t1 = time()
         
-        prob = out['prob']
         if (need_output):
             # Generate output name
             output_filename = str(os.path.splitext(os.path.basename(image_name))[0])+'.npy'
             output_filename = os.path.join(os.path.dirname(output_folder), output_filename) 
             # Save output
-            detection_output(prob, output_filename)
-            classification_output(prob, output_filename)
-            
+            if task_type == 'classification':
+                classification_output(out, output_filename)
+            elif task_type == 'detection':
+                detection_output(out, output_filename)
         inference_time.append(t1 - t0)
-    return prob, inference_time
+    return out, inference_time
 
 def classification_output(prob, output_file):
+    prob = prob['prob']
     prob = prob[0]
     np.savetxt(output_file, prob)
 
 def detection_output(prob, output_file):
-    print(prob.shape)
-
+    prob = prob['detection_out']
+    prob = prob[0,0,:,:]
+    np.savetxt(output_file, prob)
 
 def three_sigma_rule(time):
     average_time = np.mean(time)
@@ -149,7 +153,7 @@ def main():
     # Execute network
     pred, inference_time = caffe_benchmark(net, transformer, args.number_iter,
                                      args.input_folder, args.output,
-                                     args.output_folder)
+                                     args.output_folder, args.task_type)
 
     # Write benchmark results
     inference_time = three_sigma_rule(inference_time)
