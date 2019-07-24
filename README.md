@@ -10,9 +10,9 @@ Clone this repository to destination machine.
  python3 <openvino_dir>/deployment_tools/tools/model_downloader/downloader.py -- name resnet-50
  python3 <openvino_dir>/deployment_tools/tools/model_downloader/downloader.py -- name ssd300
  
- python3 <openvino_dir>/deployment_tools/model_optimizer/mo.py --input_model <resnet50_folder>/resnet-50.caffemodel --input_proto <resnet50_folder>/resnet-50.prototxt 
+ python3 <openvino_dir>/deployment_tools/model_optimizer/mo.py --input_model <resnet50_folder>/resnet-50.caffemodel --input_proto <resnet50_folder>/resnet-50.prototxt --output <output_folder> 
  
- python3 <openvino_dir>/deployment_tools/model_optimizer/mo.py --input_model <ssd300_folder>/ssd300.caffemodel --input_proto <ssd300_folder>/ssd300.prototxt --mean_values [104.0,117.0,123.0]
+ python3 <openvino_dir>/deployment_tools/model_optimizer/mo.py --input_model <ssd300_folder>/ssd300.caffemodel --input_proto <ssd300_folder>/ssd300.prototxt --output <output_folder> --mean_values [104.0,117.0,123.0]
  
 ```
 
