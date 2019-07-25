@@ -81,7 +81,21 @@ Variant 1. Install opencv from conda
  conda activate opencv
  cd <IXPUG_DNN_benchmark>/opencv_benchmark
  mkdir results_classification
- python3 opencv_benchmark.py -i ../datasets/imagenet/ -p ../models/resnet-50.prototxt -m ../models/resnet-50.caffemodel -ni 1000 -o False -of ./results_classification/ -r ./results_classification/result.csv -w 224 -he 224 -s 1.0
+ python3 opencv_benchmark.py -i ../datasets/imagenet/ -p ../models/resnet-50.prototxt -m ../models/resnet-50.caffemodel -ni 1000 -of ./results_classification/ -r ./results_classification/result.csv -w 224 -he 224 -s 1.0
+```
+
+if you want to save images output add argument `-o True`.
+
+### Start benchmark detection
+
+```bash
+ conda activate opencv
+ cd <IXPUG_DNN_benchmark>/opencv_benchmark
+ mkdir results_detection
+ (opencv) D:\_dev\IXPUG_DNN_benchmark\opencv_benchmark>python opencv_benchmark.py
+ -t detection -i ../datasets/pascal_voc/ -p ../models/ssd300.prototxt -m ../mode
+ls/ssd300.caffemodel -ni 1000 -of ./results_detection/ -r ./results_detection/res
+ult.csv -w 300 -he 300 -s 1.0
 ```
 
 ## OpenVINO
