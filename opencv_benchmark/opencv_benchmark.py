@@ -8,9 +8,13 @@ OpenCV classification benchmarking script
 Sample string to run benchmark: 
 
 cd IXPUG_DNN_benchmark/opencv_benchmark
-python3 opencv_benchmark.py -i ../datasets/imagenet/ -p ../models/resnet-50.prototxt -m ../models/resnet-50.caffemodel -ni 2 -o False -of ./result/ -r result.csv
 
-Last modified 22.07.2019
+mkdir results_classification
+python3 opencv_benchmark.py -i ../datasets/imagenet/ -p ../models/resnet-50.prototxt -m ../models/resnet-50.caffemodel -ni 1000 -of ./results_classification/ -r ./results_classification/result.csv -w 224 -he 224 -s 1.0
+
+
+
+Last modified 25.07.2019
 
 """
 
@@ -37,7 +41,7 @@ def build_argparser():
     parser.add_argument('-ni', '--number_iter', help='Number of inference \
         iterations', required=True, type=int)
     parser.add_argument('-o', '--output', help='Get output',
-        required=True, type=bool)
+        default=False, type=bool)
     parser.add_argument('-of', '--output_folder', help='Name of output folder',
         default='', type=str)
     parser.add_argument('-r', '--result_file', help='Name of output folder', 
@@ -50,7 +54,7 @@ def load_network(model, config):
     
     return net
     
-def opencv_benchmark(net, transformer, number_iter, input_folder, 
+def opencv_benchmark(net, number_iter, input_folder, 
                     need_output = False, output_folder = ''):
     
     filenames = os.listdir(input_folder)
@@ -118,19 +122,16 @@ def write_row(filename, net_name, number_iter, average_time, latency, fps):
     file.write(row + '\n')
     file.close()
 
-
-
 def main():
     args = build_argparser().parse_args()
     create_result_file(args.result_file)
-    transformer = 5
     
     
     # Load network
     net = load_network(args.model, args.proto)
     
     # Execute network
-    pred, inference_time = opencv_benchmark(net, transformer, args.number_iter,
+    pred, inference_time = opencv_benchmark(net, args.number_iter,
                                      args.input_folder, args.output,
                                      args.output_folder)
     
