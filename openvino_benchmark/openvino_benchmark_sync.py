@@ -39,7 +39,7 @@ def build_argparser():
     parser.add_argument('-ni', '--number_iter', help='Number of inference \
         iterations', required=True, type=int)
     parser.add_argument('-o', '--output', help='Get output',
-        required=True, type=bool)
+        default=False, type=bool)
     parser.add_argument('-of', '--output_folder', help='Name of output folder',
         default='', type=str)
     parser.add_argument('-r', '--result_file', help='Name of output folder', 
@@ -50,11 +50,14 @@ def build_argparser():
         required=True, type=int)
     parser.add_argument('-b', '--batch_size', help='batch size', 
         required=True, type=int)
-    
+    parser.add_argument('-t', '--task_type', help='Task type: \
+        classification / detection', default = 'classification', type=str)
     parser.add_argument('-d', '--device', help = 'Specify the target \
         device to infer on; CPU, GPU, FPGA or MYRIAD is acceptable. \
         Sample will look for a suitable plugin for device specified \
         (CPU by default)', default = 'CPU', type = str)
+    parser.add_argument('-e', '--extention', help='Library with custom layers',
+        default='', type=str)
         
     return parser
 
@@ -120,7 +123,7 @@ def load_images(model, input_folder):
     
 
 def openvino_benchmark_sync(exec_net, net, number, batch_size, input_folder, 
-                    need_output = False, output_folder = ''):
+                    need_output = False, output_folder = '', task_type = ''):
     inference_time = []
     input_blob = next(iter(net.inputs))
     out_blob = next(iter(net.outputs))
@@ -153,7 +156,10 @@ def openvino_benchmark_sync(exec_net, net, number, batch_size, input_folder,
                 output_filename = str(os.path.splitext(os.path.basename(image_name))[0])+'.npy'
                 output_filename = os.path.join(os.path.dirname(output_folder), output_filename) 
                 # Save output
-                classification_output(preds[k-a,:], output_filename)
+                if task_type == 'classification':
+                    classification_output(preds[k-a,:], output_filename)
+                elif task_type == 'detection':
+                    detection_output(preds[k-a,:], output_filename)
         inference_time.append(t1 - t0)
         
     perf_counts = exec_net.requests[0].get_perf_counts()
@@ -163,6 +169,9 @@ def openvino_benchmark_sync(exec_net, net, number, batch_size, input_folder,
 
 
 def classification_output(prob, output_file):
+    np.savetxt(output_file, prob)
+    
+def detection_output(prob, output_file):
     np.savetxt(output_file, prob)
 
 def three_sigma_rule(time):
@@ -226,7 +235,7 @@ def main():
     create_result_file(args.result_file)
     
     # Load network
-    net, plugin = prepare_model(log, args.config, args.model, '', 
+    net, plugin = prepare_model(log, args.config, args.model, args.extention, 
                                 ['CPU'], '', args.thread_num,
                                 args.stream_num)
     net.batch_size = args.batch_size
@@ -235,7 +244,7 @@ def main():
     # Execute network
     pred, inference_time = openvino_benchmark_sync(exec_net, net, args.number_iter,
                                      args.batch_size, args.input_folder, args.output,
-                                     args.output_folder)
+                                     args.output_folder, args.task_type)
     
     # Write benchmark results
     inference_time = three_sigma_rule(inference_time)

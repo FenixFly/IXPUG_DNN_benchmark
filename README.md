@@ -102,6 +102,7 @@ ult.csv -w 300 -he 300 -s 1.0
 
 Variant 1. Install from off. site
 
+
 ### Optimization 
 To get better pefformance, try different `-tn`, `-sn`, and `-b` parameters, and set `-o` parameter (output) to `False`.
 
@@ -110,8 +111,9 @@ To get better pefformance, try different `-tn`, `-sn`, and `-b` parameters, and 
 ```bash
  conda activate openvino
  cd <IXPUG_DNN_benchmark>/openvino_benchmark
- mkdir result_sync
- mkdir result_async
+ mkdir result_sync_classification
+ mkdir result_async_classification
+ 
  
  python3 openvino_benchmark_sync.py -i ../datasets/imagenet/ -c ../models/resnet-50.xml -m ../models/resnet-50.bin -ni 1000 -o False -of ./result_sync/ -r result_sync.csv -s 1.0 -w 224 -he 224 -tn 1 -sn 1 -b 1
 
@@ -123,10 +125,10 @@ To get better pefformance, try different `-tn`, `-sn`, and `-b` parameters, and 
 ```bash
  conda activate openvino
  cd <IXPUG_DNN_benchmark>/openvino_benchmark
- mkdir result_sync
- mkdir result_async
+ mkdir result_sync_detection
+ mkdir result_async_detection
  
- python3 openvino_benchmark_sync.py -i ../datasets/imagenet/ -c ../models/ssd300.xml -m ../models/ssd300.bin -ni 1000 -o False -of ./result_sync/ -r result_sync.csv -s 1.0 -w 300 -he 300 -tn 1 -sn 1 -b 1
+python3 openvino_benchmark_sync.py -t detection -i ../datasets/pascal_voc/ -c ../models/ssd300.xml -m ../models/ssd300.bin -ni 1000 -of ./result_sync_detection/ -r ./result_sync_detection/result_sync.csv -s 1.0 -w 300 -he 300 -tn 1 -sn 1 -b 1 -e ~/intel/openvino/deployment_tools/inference_engine/lib/intel64/libcpu_extension_avx2.so
 
- python3 openvino_benchmark_async.py -i ../datasets/imagenet/ -c ../models/ssd300.xml -m ../models/ssd300.bin -ni 1000 -o False -of ./result_async/ -r result_async.csv -s 1.0 -w 300 -he 300 -tn 1 -sn 1 -b 1
+python3 openvino_benchmark_async.py -t detection -i ../datasets/pascal_voc/ -c ../models/ssd300.xml -m ../models/ssd300.bin -ni 1000 -of ./result_async_detection/ -r ./result_async_detection/result_async.csv -s 1.0 -w 300 -he 300 -tn 1 -sn 1 -b 1 -e ~/intel/openvino/deployment_tools/inference_engine/lib/intel64/libcpu_extension_avx2.so
 ```

@@ -40,7 +40,7 @@ def build_argparser():
     parser.add_argument('-ni', '--number_iter', help='Number of inference \
         iterations', required=True, type=int)
     parser.add_argument('-o', '--output', help='Get output',
-        required=True, type=bool)
+        default=False, type=bool)
     parser.add_argument('-of', '--output_folder', help='Name of output folder',
         default='', type=str)
     parser.add_argument('-r', '--result_file', help='Name of output folder', 
@@ -51,11 +51,14 @@ def build_argparser():
         required=True, type=int)
     parser.add_argument('-b', '--batch_size', help='batch size', 
         required=True, type=int)
-    
     parser.add_argument('-d', '--device', help = 'Specify the target \
         device to infer on; CPU, GPU, FPGA or MYRIAD is acceptable. \
         Sample will look for a suitable plugin for device specified \
         (CPU by default)', default = 'CPU', type = str)
+    parser.add_argument('-t', '--task_type', help='Task type: \
+        classification / detection', default = 'classification', type=str)
+    parser.add_argument('-e', '--extention', help='Library with custom layers',
+        default='', type=str)
         
     return parser
 
@@ -121,7 +124,7 @@ def load_images(model, input_folder):
     
 
 def openvino_benchmark_async(exec_net, net, number, batch_size, input_folder, 
-                    need_output = False, output_folder = ''):
+                    need_output = False, output_folder = '', task_type = ''):
     curr_request_id = 0
     prev_request_id  = 1
     input_blob = next(iter(net.inputs))
@@ -179,6 +182,10 @@ def openvino_benchmark_async(exec_net, net, number, batch_size, input_folder,
 def classification_output(prob, output_file):
     np.savetxt(output_file, prob)
 
+def detection_output(prob, output_file):
+    np.savetxt(output_file, prob)
+
+
 def create_result_file(filename):
     if os.path.isfile(filename):
         return
@@ -230,7 +237,7 @@ def main():
     create_result_file(args.result_file)
     
     # Load network
-    net, plugin = prepare_model(log, args.config, args.model, '', 
+    net, plugin = prepare_model(log, args.config, args.model, args.extention, 
                                 ['CPU'], '', args.thread_num,
                                 args.stream_num)
     net.batch_size = args.batch_size
@@ -239,7 +246,7 @@ def main():
     # Execute network
     pred, inference_time = openvino_benchmark_async(exec_net, net, args.number_iter,
                                      args.batch_size, args.input_folder, args.output,
-                                     args.output_folder)
+                                     args.output_folder, args.task_type)
     
     # Write prediction
     if args.output:
