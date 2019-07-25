@@ -80,8 +80,8 @@ Variant 1. Install opencv from conda
 ```bash
  conda activate opencv
  cd <IXPUG_DNN_benchmark>/opencv_benchmark
- mkdir result
- python3 opencv_benchmark.py -i ../datasets/imagenet/ -p ../models/resnet-50.prototxt -m ../models/resnet-50.caffemodel -ni 1000 -o False -of ./result/ -r result.csv -w 224 -he 224
+ mkdir results_classification
+ python3 opencv_benchmark.py -i ../datasets/imagenet/ -p ../models/resnet-50.prototxt -m ../models/resnet-50.caffemodel -ni 1000 -o False -of ./results_classification/ -r ./results_classification/result.csv -w 224 -he 224 -s 1.0
 ```
 
 ## OpenVINO
