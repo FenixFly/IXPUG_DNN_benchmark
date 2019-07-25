@@ -1,1 +1,9 @@
-python3 opencv_benchmark.py -i ../datasets/imagenet/ -p ../models/resnet-50.prototxt -m ../models/resnet-50.caffemodel -ni 1000 -o False -of ./result/ -r result.csv -w 224 -he 224 -s 1.0
+mkdir results_classification
+
+python3 opencv_benchmark.py -t classification -i ../datasets/imagenet/ -p ../models/resnet-50.prototxt -m ../models/resnet-50.caffemodel -ni 1000 -of ./results_classification/ -r ./results_classification/result.csv -w 224 -he 224 -s 1.0
+
+
+
+mkdir results_detection
+
+python3 opencv_benchmark.py -t detection -i ../datasets/pascal_voc/ -p ../models/ssd300.prototxt -m ../models/ssd300.caffemodel -ni 1000 -of ./results_detection/ -r ./results_detection/result.csv -w 300 -he 300 -s 1.0

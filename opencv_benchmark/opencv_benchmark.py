@@ -46,6 +46,8 @@ def build_argparser():
         default='', type=str)
     parser.add_argument('-r', '--result_file', help='Name of output folder', 
         default='result.csv', type=str)
+    parser.add_argument('-t', '--task_type', help='Task type: \
+        classification / detection', default = 'classification', type=str)
         
     return parser
 
@@ -55,7 +57,7 @@ def load_network(model, config):
     return net
     
 def opencv_benchmark(net, number_iter, input_folder, 
-                    need_output = False, output_folder = ''):
+                    need_output = False, output_folder = '', task_type = ''):
     
     filenames = os.listdir(input_folder)
     filenames_size = len(filenames)
@@ -76,12 +78,19 @@ def opencv_benchmark(net, number_iter, input_folder,
             output_filename = str(os.path.splitext(os.path.basename(image_name))[0])+'.npy'
             output_filename = os.path.join(os.path.dirname(output_folder), output_filename) 
             # Save output
-            classification_output(preds, output_filename)
+            if task_type == 'classification':
+                classification_output(preds, output_filename)
+            elif task_type == 'detection':
+                detection_output(preds, output_filename)
         inference_time.append(t1 - t0)
     return preds, inference_time
 
 def classification_output(prob, output_file):
     prob = prob[0]
+    np.savetxt(output_file, prob)
+
+def detection_output(prob, output_file):
+    prob = prob[0,0,:,:]
     np.savetxt(output_file, prob)
 
 def three_sigma_rule(time):
@@ -133,7 +142,7 @@ def main():
     # Execute network
     pred, inference_time = opencv_benchmark(net, args.number_iter,
                                      args.input_folder, args.output,
-                                     args.output_folder)
+                                     args.output_folder,args.task_type)
     
     # Write benchmark results
     inference_time = three_sigma_rule(inference_time)
