@@ -53,11 +53,11 @@ def build_argparser():
 
 def load_network(model, config):
     net = cv2.dnn.readNet(model, config)
-    
     return net
     
 def opencv_benchmark(net, number_iter, input_folder, 
-                    need_output = False, output_folder = '', task_type = ''):
+                    need_output = False, output_folder = '', task_type = '', 
+                    blob_size = (224,224), blob_scale = 1.0):
     
     filenames = os.listdir(input_folder)
     filenames_size = len(filenames)
@@ -65,7 +65,7 @@ def opencv_benchmark(net, number_iter, input_folder,
     for i in range(number_iter):
         image_name = os.path.join(input_folder, filenames[i % filenames_size])
         image = cv2.imread(image_name)
-        blob = cv2.dnn.blobFromImage(image, 1, (224, 224), (0, 0, 0))
+        blob = cv2.dnn.blobFromImage(image, blob_scale, blob_size, (0, 0, 0))
         net.setInput(blob)
         
         
@@ -142,7 +142,8 @@ def main():
     # Execute network
     pred, inference_time = opencv_benchmark(net, args.number_iter,
                                      args.input_folder, args.output,
-                                     args.output_folder,args.task_type)
+                                     args.output_folder,args.task_type,
+                                     (args.width, args.height), args.scale)
     
     # Write benchmark results
     inference_time = three_sigma_rule(inference_time)
