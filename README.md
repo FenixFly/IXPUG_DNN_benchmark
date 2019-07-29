@@ -92,10 +92,7 @@ if you want to save images output add argument `-o True`.
  conda activate opencv
  cd <IXPUG_DNN_benchmark>/opencv_benchmark
  mkdir results_detection
- (opencv) D:\_dev\IXPUG_DNN_benchmark\opencv_benchmark>python opencv_benchmark.py
- -t detection -i ../datasets/pascal_voc/ -p ../models/ssd300.prototxt -m ../mode
-ls/ssd300.caffemodel -ni 1000 -of ./results_detection/ -r ./results_detection/res
-ult.csv -w 300 -he 300 -s 1.0
+ python3 opencv_benchmark.py -t detection -i ../datasets/pascal_voc/ -p ../models/ssd300.prototxt -m ../models/ssd300.caffemodel -ni 1000 -of ./results_detection/ -r ./results_detection/result.csv -w 300 -he 300 -s 1.0
 ```
 
 ## OpenVINO
