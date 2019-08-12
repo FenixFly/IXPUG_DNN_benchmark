@@ -39,7 +39,7 @@ def build_argparser():
     parser.add_argument('-ni', '--number_iter', help='Number of inference \
         iterations', required=True, type=int)
     parser.add_argument('-o', '--output', help='Get output',
-        default=False, type=bool)
+        default=False, type=lambda x: (str(x).lower() == 'true'))
     parser.add_argument('-of', '--output_folder', help='Name of output folder',
         default='', type=str)
     parser.add_argument('-r', '--result_file', help='Name of output folder', 
@@ -109,17 +109,20 @@ def prepare_model(log, model, weights, cpu_extension, device_list, plugin_dir,
         plugin.set_initial_affinity(net)
     return net, plugin
 
-def load_images(model, input_folder):
+def load_images(model, input_folder, numbers):
     data = os.listdir(input_folder)
     n, c, h, w  = model.inputs[next(iter(model.inputs))].shape
-    images = np.ndarray(shape = (len(data), c, h, w))
-    for i in range(len(data)):
+    counts = numbers
+    if len(data)<numbers:
+        counts = len(data)
+    images = np.ndarray(shape = (counts, c, h, w))
+    for i in range(counts):
         image = cv2.imread(os.path.join(input_folder, data[i]))
         if (image.shape[:-1] != (h, w)):
             image = cv2.resize(image, (w, h))
-        image = image.transpose((2, 0, 1))
-        images[i] = image
-    return images
+        images[i] = image.transpose((2, 0, 1))
+        del image
+    return images, counts
     
 
 def openvino_benchmark_sync(exec_net, net, number, batch_size, input_folder, 
@@ -129,10 +132,10 @@ def openvino_benchmark_sync(exec_net, net, number, batch_size, input_folder,
     out_blob = next(iter(net.outputs))
     filenames = os.listdir(input_folder)
     filenames_size = len(filenames)
-    images = load_images(net, input_folder)
     
     number_iter = (number + batch_size - 1) // batch_size
-    
+    images, counts = load_images(net, input_folder, number_iter * batch_size)
+        
     for i in range(number_iter):
         
         a = (i * batch_size) % len(images) 
