@@ -40,7 +40,7 @@ def build_argparser():
     parser.add_argument('-ni', '--number_iter', help='Number of inference \
         iterations', required=True, type=int)
     parser.add_argument('-o', '--output', help='Get output',
-        default=False, type=lambda x: (str(x).lower() == 'True'))
+        default=False, type=lambda x: (str(x).lower() == 'true'))
     parser.add_argument('-of', '--output_folder', help='Name of output folder',
         default='', type=str)
     parser.add_argument('-r', '--result_file', help='Name of output folder', 
