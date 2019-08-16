@@ -46,9 +46,9 @@ def build_argparser():
     parser.add_argument('-r', '--result_file', help='Name of output folder', 
         default='result.csv', type=str)
     parser.add_argument('-tn', '--thread_num', help='threads num', 
-        required=True, type=int)
+        required=False, type=int)
     parser.add_argument('-sn', '--stream_num', help='threads num', 
-        required=True, type=int)
+        required=False, type=int)
     parser.add_argument('-b', '--batch_size', help='batch size', 
         required=True, type=int)
     parser.add_argument('-d', '--device', help = 'Specify the target \

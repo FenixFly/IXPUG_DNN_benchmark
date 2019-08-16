@@ -8,7 +8,7 @@ OpenVINO classification benchmarking script
 Sample string to run benchmark: 
 
 cd IXPUG_DNN_benchmark/openvino_benchmark
-python3 openvino_benchmark_sync.py -i ../datasets/imagenet/ -c ../models/resnet-50.xml -m ../models/resnet-50.bin -ni 1000 -o True -of ./result/ -r result.csv -s 1.0 -w 224 -he 224 -tn 1 -sn 1 -b 1
+python3 openvino_benchmark_sync.py -i ../datasets/imagenet/ -c ../models/resnet-50.xml -m ../models/resnet-50.bin -ni 1000 -o True -of ./result/ -r result.csv -s 1.0 -w 224 -he 224 -b 1
 Last modified 17.07.2019
 
 """
@@ -45,9 +45,7 @@ def build_argparser():
     parser.add_argument('-r', '--result_file', help='Name of output folder', 
         default='result.csv', type=str)
     parser.add_argument('-tn', '--thread_num', help='threads num', 
-        required=True, type=int)
-    parser.add_argument('-sn', '--stream_num', help='stream num', 
-        required=True, type=int)
+        required=False, type=int)
     parser.add_argument('-b', '--batch_size', help='batch size', 
         required=True, type=int)
     parser.add_argument('-t', '--task_type', help='Task type: \
@@ -63,7 +61,7 @@ def build_argparser():
 
 
 def prepare_model(log, model, weights, cpu_extension, device_list, plugin_dir,
-                  thread_num, stream_num):
+                  thread_num):
     model_xml = model
     model_bin = weights
     if len(device_list) == 1:
@@ -97,12 +95,6 @@ def prepare_model(log, model, weights, cpu_extension, device_list, plugin_dir,
             plugin.set_config({'CPU_THREADS_NUM': str(thread_num)})
         else:
             log.error('Parameter : Number of threads is used only for CPU')
-            sys.exit(1)
-    if stream_num is not None:
-        if 'CPU' in device_list:
-            plugin.set_config({'CPU_THROUGHPUT_STREAMS': str(stream_num)})
-        else:
-            log.error('Parameter : Number of streams is used only for CPU')
             sys.exit(1)
     if len(device_list) == 2:
         plugin.set_config({'TARGET_FALLBACK': device})
@@ -204,13 +196,13 @@ def create_result_file(filename):
     if os.path.isfile(filename):
         return
     file = open(filename, 'w')
-    head = 'Model;Batch size;Device;IterationCount;Threads num;Streams num;Average time of single pass (s);Latency;FPS;'
+    head = 'Model;Batch size;Device;IterationCount;Threads num;Average time of single pass (s);Latency;FPS;'
     file.write(head + '\n')
     file.close()
 
-def write_row(filename, net_name, number_iter, batch_size, thread_num, stream_num, average_time, latency, fps):
-    row = '{0};{1};CPU;{2};{3};{4};{5:.3f};{6:.3f};{7:.3f}'.format(
-            net_name, batch_size, number_iter, thread_num, stream_num,
+def write_row(filename, net_name, number_iter, batch_size, thread_num, average_time, latency, fps):
+    row = '{0};{1};CPU;{2};{3};{4:.3f};{5:.3f};{6:.3f}'.format(
+            net_name, batch_size, number_iter, thread_num,
            average_time, latency, fps)
     file = open(filename, 'a')
     file.write(row + '\n')
@@ -239,8 +231,7 @@ def main():
     
     # Load network
     net, plugin = prepare_model(log, args.config, args.model, args.extention, 
-                                ['CPU'], '', args.thread_num,
-                                args.stream_num)
+                                ['CPU'], '', args.thread_num)
     net.batch_size = args.batch_size
     exec_net = plugin.load(network=net)
     
@@ -256,7 +247,7 @@ def main():
     
     fps = calculate_fps(args.batch_size, latency)
     write_row(args.result_file, os.path.basename(args.model), args.number_iter, 
-              args.batch_size, args.thread_num, args.stream_num, average_time, latency, fps)
+              args.batch_size, args.thread_num, average_time, latency, fps)
     
     del exec_net
     del net
