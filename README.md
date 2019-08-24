@@ -101,7 +101,7 @@ Variant 1. Install from off. site
 
 
 ### Optimization 
-To get better performance, try different `-tn`, `-sn`, and `-b` parameters, and set `-o` parameter (output) to `False`.
+To get better performance, try different `-tn`, `-sn`, `-rn` and `-b` parameters, and set `-o` parameter (output) to `False`.
 
 ### Start benchmark classifiction
 

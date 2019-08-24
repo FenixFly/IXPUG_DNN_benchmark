@@ -126,12 +126,10 @@ def load_images(model, input_folder, numbers):
         images[i] = image.transpose((2, 0, 1))
         del image
     return images, counts
-    
 
-def openvino_benchmark_async(exec_net, net, number, batch_size, request_num, input_folder, 
+def openvino_benchmark_async(exec_net, net, number, batch_size, input_folder,request_num,
                     need_output = False, output_folder = '', task_type = ''):
-    curr_request_id = 0
-    prev_request_id  = 1
+    
     input_blob = next(iter(net.inputs))
     out_blob = next(iter(net.outputs))
     filenames = os.listdir(input_folder)
@@ -141,39 +139,115 @@ def openvino_benchmark_async(exec_net, net, number, batch_size, request_num, inp
     images, counts = load_images(net, input_folder, number_iter * batch_size)
     
     t0 = time()
-    first = True
+    
     res = []
     
-    for i in range(number_iter):
+    if request_num == 2: 
+        curr_request_id = 0
+        prev_request_id  = 1
+        first = True
+        for i in range(number_iter):
+            a = (i * batch_size) % len(images) 
+            b = (((i + 1) * batch_size - 1) % len(images)) + 1
         
-        a = (i * batch_size) % len(images) 
-        b = (((i + 1) * batch_size - 1) % len(images)) + 1         
-        
-        im_batch = images[a : b:]
+            im_batch = images[a : b]
     
-        if (a > b):
-            im_batch = images[b : b+batch_size:]
-        infer_request_handle = exec_net.start_async(request_id = curr_request_id, 
+            if (a > b):
+                im_batch = images[b : b+batch_size:]
+            infer_request_handle = exec_net.start_async(request_id = curr_request_id, 
                                 inputs = {input_blob : im_batch})
-        if first == True:
-            first = False
+            if first == True:
+                first = False
+                prev_request_id, curr_request_id = curr_request_id, prev_request_id
+                continue
+            if exec_net.requests[prev_request_id].wait(-1) == 0:
+                if need_output:
+                    res.append(copy.copy(exec_net.requests[prev_request_id].
+                        outputs[next(iter(net.outputs))]))
             prev_request_id, curr_request_id = curr_request_id, prev_request_id
-            continue
-        
+    
         if exec_net.requests[prev_request_id].wait(-1) == 0:
             if need_output:
                 res.append(copy.copy(exec_net.requests[prev_request_id].
-                        outputs[next(iter(net.outputs))]))
-        prev_request_id, curr_request_id = curr_request_id, prev_request_id
-    if exec_net.requests[prev_request_id].wait(-1) == 0:
-        if need_output:
-            res.append(copy.copy(exec_net.requests[prev_request_id].
                     outputs[next(iter(net.outputs))]))
+        
+    if request_num > 2:
+        requests_images = [-1 for i in range(request_num)]
+        res = [-1 for i in range(len(images))]
+        
+        print ()
+        requests_status = []
+        k = request_num
+        
+        for request_id in range(request_num):
+            
+            a = (request_id * batch_size) % len(images) 
+            b = (((request_id + 1) * batch_size - 1) % len(images)) + 1
+            
+            infer_request_handle = exec_net.start_async(request_id = request_id,
+                     inputs = {input_blob: images[a:b]})
+            requests_images[request_id] = (a, b)
+            
+        while k < number_iter:
+            while not len(requests_status):
+                for request_id in range(request_num):
+                    if exec_net.requests[request_id].wait(0) == 0:
+                        requests_status.append(request_id)
+                    
+            for request_id in requests_status:
+                if not (k < number_iter):
+                    break
+                exec_net.requests[request_id].wait(1)
+                start = requests_images[request_id][0]
+                r_size = requests_images[request_id][-1]
+                tmp_buf = (exec_net.requests[request_id]. 
+                        outputs[next(iter(net.outputs))])
+                z = 0
+                for i in range(start, r_size):
+                    if type(res[i]) is int:
+                        res[i] = copy.copy(tmp_buf[z])
+                    else:
+                        res.append(copy.copy(tmp_buf[z]))
+                    z += 1
+                    
+                a = (k * batch_size) % len(images) 
+                b = (((k + 1) * batch_size - 1) % len(images)) + 1
+            
+                #print(request_id, a,b)
+                exec_net.start_async(request_id = request_id, inputs = {input_blob: images[a:b]})
+                requests_images[request_id] = (a, b)
                 
+                k += 1
+            requests_status.clear()
+        else:
+            for request_id in range(request_num):
+                if exec_net.requests[request_id].wait(0) != 0:
+                    requests_status.append(request_id)
+            some_active = True
+            while some_active:
+                some_active = False
+                for request_id in requests_status:
+                    if (exec_net.requests[request_id].wait(0) != 0):
+                        some_active = True
+                        break
+            for request_id in requests_status:
+                exec_net.requests[request_id].wait(1)
+                start = requests_images[request_id][0]
+                r_size = requests_images[request_id][-1]
+                tmp_buf = (exec_net.requests[request_id]. 
+                        outputs[next(iter(net.outputs))])
+                z = 0
+                for i in range(start, r_size):
+                    if type(res[i]) is int:
+                        res[i] = copy.copy(tmp_buf[z])
+                    else:
+                        res.append(copy.copy(tmp_buf[z]))
+                    z += 1
+                res = np.asarray(res[0: len(images)][:])
+            
     t1 = time()
     inference_time = t1 - t0
     
-        
     perf_counts = infer_request_handle.get_perf_counts()
     write_perf_rows(perf_counts, os.path.join(output_folder, 'perf_counts.txt'))
     
@@ -196,13 +270,13 @@ def create_result_file(filename):
     if os.path.isfile(filename):
         return
     file = open(filename, 'w')
-    head = 'Model;Batch size;Device;IterationCount;Thread num;Stream num; Average time (s); FPS;'
+    head = 'Model;Batch size;Device;IterationCount;Thread num;Stream num; Requests num, Average time (s); FPS;'
     file.write(head + '\n')
     file.close()
 
-def write_row(filename, net_name, number_iter, batch_size, thread_num, stream_num, average_time, fps):
-    row = '{0};{1};CPU;{2};{3};{4};{5:.3f};{6:.3f}'.format(net_name, batch_size, 
-           number_iter, thread_num, stream_num, average_time, fps)
+def write_row(filename, net_name, number_iter, batch_size, thread_num, stream_num, requests_num, average_time, fps):
+    row = '{0};{1};CPU;{2};{3};{4};{5};{6:.3f};{7:.3f}'.format(net_name, batch_size, 
+           number_iter, thread_num, stream_num, requests_num, average_time, fps)
     file = open(filename, 'a')
     file.write(row + '\n')
     file.close()
@@ -237,6 +311,7 @@ def write_perf_rows(perf_counts, filename):
     file.close()
 
 def main():
+    
     args = build_argparser().parse_args()
     log.basicConfig(format = '[ %(levelname)s ] %(message)s',
         level = log.INFO, stream = sys.stdout)
@@ -246,8 +321,8 @@ def main():
     net, plugin = prepare_model(log, args.config, args.model, args.extention, 
                                 ['CPU'], '', args.thread_num,
                                 args.stream_num)
-    net.batch_size = args.batch_size
-    exec_net = plugin.load(network=net, num_requests = 2)
+    
+    exec_net = plugin.load(network=net, num_requests = args.request_num)
     
     # Execute network
     pred, inference_time = openvino_benchmark_async(exec_net, net, args.number_iter,
@@ -262,7 +337,7 @@ def main():
     # Write benchmark results
     fps = calculate_fps_async(args.number_iter, inference_time)
     write_row(args.result_file, os.path.basename(args.model), args.number_iter, 
-              args.batch_size, args.thread_num, args.stream_num, inference_time, fps)
+              args.batch_size, args.thread_num, args.stream_num, args.request_num, inference_time, fps)
     
     del exec_net
     del net
