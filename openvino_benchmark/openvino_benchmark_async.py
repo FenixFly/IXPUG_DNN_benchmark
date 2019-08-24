@@ -49,6 +49,8 @@ def build_argparser():
         required=False, type=int)
     parser.add_argument('-sn', '--stream_num', help='threads num', 
         required=False, type=int)
+    parser.add_argument('-rn', '--request_num', help='request num', 
+        required=False, type=int)
     parser.add_argument('-b', '--batch_size', help='batch size', 
         required=True, type=int)
     parser.add_argument('-d', '--device', help = 'Specify the target \
@@ -126,7 +128,7 @@ def load_images(model, input_folder, numbers):
     return images, counts
     
 
-def openvino_benchmark_async(exec_net, net, number, batch_size, input_folder, 
+def openvino_benchmark_async(exec_net, net, number, batch_size, request_num, input_folder, 
                     need_output = False, output_folder = '', task_type = ''):
     curr_request_id = 0
     prev_request_id  = 1
@@ -249,7 +251,7 @@ def main():
     
     # Execute network
     pred, inference_time = openvino_benchmark_async(exec_net, net, args.number_iter,
-                                     args.batch_size, args.input_folder, args.output,
+                                     args.batch_size, args.input_folder, args.request_num, args.output,
                                      args.output_folder, args.task_type)
     
     # Write prediction
