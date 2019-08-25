@@ -48,6 +48,8 @@ def build_argparser():
         default='result.csv', type=str)
     parser.add_argument('-t', '--task_type', help='Task type: \
         classification / detection', default = 'classification', type=str)
+    parser.add_argument('-b', '--batch_size', help='batch size', 
+        required=True, type=int)
         
     return parser
 
@@ -57,15 +59,27 @@ def load_network(model, config):
     
 def opencv_benchmark(net, number_iter, input_folder, 
                     need_output = False, output_folder = '', task_type = '', 
-                    blob_size = (224,224), blob_scale = 1.0):
+                    blob_size = (224,224), blob_scale = 1.0, batch_size = 1):
     
     filenames = os.listdir(input_folder)
     filenames_size = len(filenames)
     inference_time = []
+    
+    number_iter = (number_iter + batch_size - 1) // batch_size
     for i in range(number_iter):
-        image_name = os.path.join(input_folder, filenames[i % filenames_size])
-        image = cv2.imread(image_name)
-        blob = cv2.dnn.blobFromImage(image, blob_scale, blob_size, (0, 0, 0))
+        
+        if batch_size > 1:
+            images = []
+            for j in range(batch_size):
+                image_name = os.path.join(input_folder, filenames[(i * batch_size + j) % filenames_size])
+                image = cv2.imread(image_name)
+                images.append(image)
+            blob = cv2.dnn.blobFromImages(images, blob_scale, blob_size, (0, 0, 0))
+        else:
+            image_name = os.path.join(input_folder, filenames[i % filenames_size])
+            image = cv2.imread(image_name)
+            blob = cv2.dnn.blobFromImage(image, blob_scale, blob_size, (0, 0, 0))
+        
         net.setInput(blob)
         
         
@@ -74,14 +88,17 @@ def opencv_benchmark(net, number_iter, input_folder,
         t1 = time()
         
         if (need_output == True):
-            # Generate output name
-            output_filename = str(os.path.splitext(os.path.basename(image_name))[0])+'.npy'
-            output_filename = os.path.join(os.path.dirname(output_folder), output_filename) 
-            # Save output
-            if task_type == 'classification':
-                classification_output(preds, output_filename)
-            elif task_type == 'detection':
-                detection_output(preds, output_filename)
+            
+            if batch_size == 1:
+                # Generate output name
+                output_filename = str(os.path.splitext(os.path.basename(image_name))[0])+'.npy'
+                output_filename = os.path.join(os.path.dirname(output_folder), output_filename) 
+                # Save output
+                if task_type == 'classification':
+                    classification_output(preds, output_filename)
+                elif task_type == 'detection':
+                    detection_output(preds, output_filename)
+                
         inference_time.append(t1 - t0)
     return preds, inference_time
 
@@ -124,8 +141,8 @@ def create_result_file(filename):
     file.write(head + '\n')
     file.close()
 
-def write_row(filename, net_name, number_iter, average_time, latency, fps):
-    row = '{0};1;CPU;{1};{2:.3f};{3:.3f};{4:.3f}'.format(net_name, number_iter, 
+def write_row(filename, net_name, number_iter, batch_size, average_time, latency, fps):
+    row = '{};{};CPU;{};{:.3f};{:.3f};{:.3f}'.format(net_name, batch_size, number_iter, 
            average_time, latency, fps)
     file = open(filename, 'a')
     file.write(row + '\n')
@@ -143,15 +160,15 @@ def main():
     pred, inference_time = opencv_benchmark(net, args.number_iter,
                                      args.input_folder, args.output,
                                      args.output_folder,args.task_type,
-                                     (args.width, args.height), args.scale)
+                                     (args.width, args.height), args.scale, args.batch_size)
     
     # Write benchmark results
     inference_time = three_sigma_rule(inference_time)
     average_time = calculate_average_time(inference_time)
     latency = calculate_latency(inference_time)
-    fps = calculate_fps(1, latency)
+    fps = calculate_fps(args.batch_size, latency)
     write_row(args.result_file, os.path.basename(args.model), args.number_iter, 
-              average_time, latency, fps)
+              args.batch_size, average_time, latency, fps)
 
 if __name__ == '__main__':
     main()
