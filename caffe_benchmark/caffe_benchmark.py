@@ -44,9 +44,11 @@ def build_argparser():
         classification / detection', default = 'classification', type=str)
     parser.add_argument('-me', '--mean', help='Input mean values', 
                         default = '[0 0 0]', type=str)
+    parser.add_argument('-b', '--batch_size', help='batch size', 
+        required=True, type=int)
     return parser
 
-def load_network(proto, model):
+def load_network(proto, model, batch_size = 1):
     caffe.set_mode_cpu()
     network = caffe.Net(proto, model, caffe.TEST)
     transformer = caffe.io.Transformer({'data': network.blobs['data'].data.shape})
@@ -54,11 +56,19 @@ def load_network(proto, model):
     transformer.set_channel_swap('data', (2,1,0))
     transformer.set_raw_scale('data', 255.0)
     
+    if batch_size > 1:
+        channels = network.blobs['data'].data.shape[1]
+        height = network.blobs['data'].data.shape[2]
+        width = network.blobs['data'].data.shape[3]
+        network.blobs['data'].reshape(batch_size, channels, height, width)
+        network.reshape()
+        
     return network, transformer
 
-def load_image_to_network(image_path, net, transformer):
-    im = caffe.io.load_image(image_path)
-    net.blobs['data'].data[...] = transformer.preprocess('data', im)
+def load_images_to_network(image_paths, net, transformer):
+    for i in range(len(image_paths)):
+        im = caffe.io.load_image(image_paths[i])
+        net.blobs['data'].data[i,:,:,:] = transformer.preprocess('data', im)
 
 def prepare_image(image_path, input_dims, scale = 1.0, mean = [0.0, 0.0, 0.0]):
     image = cv2.imread(image_path, 1).astype(np.float32) - np.asarray(mean)
@@ -68,28 +78,39 @@ def prepare_image(image_path, input_dims, scale = 1.0, mean = [0.0, 0.0, 0.0]):
     return image, image_size
 
 def caffe_benchmark(net, transformer, number_iter, input_folder,
-                    need_output = False, output_folder = '', task_type = ''):
+                    need_output = False, output_folder = '', task_type = '',
+                    batch_size = 1):
     
     filenames = os.listdir(input_folder)
     filenames_size = len(filenames)
     inference_time = []
+    
+    number_iter = (number_iter + batch_size -1) // batch_size
+    
     for i in range(number_iter):
-        image_name = os.path.join(input_folder, filenames[i % filenames_size])
-        load_image_to_network(image_name, net, transformer)
+        
+        image_names = []
+        
+        for j in range(batch_size):
+            image_name = os.path.join(input_folder, filenames[(i * number_iter + j )% filenames_size])
+            image_names.append(image_name)
+            
+        load_images_to_network(image_names, net, transformer)
         
         t0 = time()
         out = net.forward()
         t1 = time()
         
         if (need_output):
-            # Generate output name
-            output_filename = str(os.path.splitext(os.path.basename(image_name))[0])+'.npy'
-            output_filename = os.path.join(os.path.dirname(output_folder), output_filename) 
-            # Save output
-            if task_type == 'classification':
-                classification_output(out, output_filename)
-            elif task_type == 'detection':
-                detection_output(out, output_filename)
+            if batch_size == 1:
+                # Generate output name
+                output_filename = str(os.path.splitext(os.path.basename(image_name))[0])+'.npy'
+                output_filename = os.path.join(os.path.dirname(output_folder), output_filename) 
+                # Save output
+                if task_type == 'classification':
+                    classification_output(out, output_filename)
+                elif task_type == 'detection':
+                    detection_output(out, output_filename)
         inference_time.append(t1 - t0)
     return out, inference_time
 
@@ -134,8 +155,8 @@ def create_result_file(filename):
     file.write(head + '\n')
     file.close()
 
-def write_row(filename, net_name, number_iter, average_time, latency, fps):
-    row = '{0};1;CPU;{1};{2:.3f};{3:.3f};{4:.3f}'.format(net_name, number_iter, 
+def write_row(filename, net_name, batch_size, number_iter, average_time, latency, fps):
+    row = '{};{};CPU;{};{:.3f};{:.3f};{:.3f}'.format(net_name, batch_size, number_iter, 
            average_time, latency, fps)
     file = open(filename, 'a')
     file.write(row + '\n')
@@ -147,20 +168,20 @@ def main():
     create_result_file(args.result_file)
     
     # Load network
-    net, transformer= load_network(args.proto, args.model)
+    net, transformer= load_network(args.proto, args.model, args.batch_size)
     net_input_shape = np.asarray(net.blobs['data'].shape, dtype = int)
     
     # Execute network
     pred, inference_time = caffe_benchmark(net, transformer, args.number_iter,
                                      args.input_folder, args.output,
-                                     args.output_folder, args.task_type)
+                                     args.output_folder, args.task_type, args.batch_size)
 
     # Write benchmark results
     inference_time = three_sigma_rule(inference_time)
     average_time = calculate_average_time(inference_time)
     latency = calculate_latency(inference_time)
-    fps = calculate_fps(1, latency)
-    write_row(args.result_file, os.path.basename(args.model), args.number_iter, 
+    fps = calculate_fps(args.batch_size, latency)
+    write_row(args.result_file, os.path.basename(args.model), args.batch_size, args.number_iter, 
               average_time, latency, fps)
 
 if __name__ == '__main__':
