@@ -321,7 +321,7 @@ def main():
     net, plugin = prepare_model(log, args.config, args.model, args.extention, 
                                 ['CPU'], '', args.thread_num,
                                 args.stream_num)
-    
+    net.batch_size = args.batch_size
     exec_net = plugin.load(network=net, num_requests = args.request_num)
     
     # Execute network
