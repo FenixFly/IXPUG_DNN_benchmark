@@ -41,7 +41,7 @@ def build_argparser():
     parser.add_argument('-o', '--output', help='Get output',
         default=False, type=lambda x: (str(x).lower() == 'true'))
     parser.add_argument('-of', '--output_folder', help='Name of output folder',
-        default='', type=str)
+        default='./', type=str)
     parser.add_argument('-r', '--result_file', help='Name of output folder', 
         default='result.csv', type=str)
     parser.add_argument('-tn', '--thread_num', help='threads num', 
@@ -127,7 +127,9 @@ def openvino_benchmark_sync(exec_net, net, number, batch_size, input_folder,
     
     number_iter = (number + batch_size - 1) // batch_size
     images, counts = load_images(net, input_folder, number_iter * batch_size)
-        
+    
+    t0_total = time()
+    
     for i in range(number_iter):
         
         a = (i * batch_size) % len(images) 
@@ -156,11 +158,14 @@ def openvino_benchmark_sync(exec_net, net, number, batch_size, input_folder,
                 elif task_type == 'detection':
                     detection_output(preds[k-a,:], output_filename)
         inference_time.append(t1 - t0)
-        
+    
+    t1_total = time()
+    inference_total_time = t1_total - t0_total
+    
     perf_counts = exec_net.requests[0].get_perf_counts()
     write_perf_rows(perf_counts, os.path.join(output_folder, 'perf_counts.txt'))
     
-    return preds, inference_time
+    return preds, inference_time, inference_total_time
 
 
 def classification_output(prob, output_file):
@@ -180,10 +185,6 @@ def three_sigma_rule(time):
             valid_time.append(time[i])
     return valid_time
 
-def calculate_average_time(time):
-    average_time = np.mean(time)
-    return average_time
-
 def calculate_latency(time):
     time.sort()
     latency = np.median(time)
@@ -196,14 +197,14 @@ def create_result_file(filename):
     if os.path.isfile(filename):
         return
     file = open(filename, 'w')
-    head = 'Model;Batch size;Device;IterationCount;Threads num;Average time of single pass (s);Latency;FPS;'
+    head = 'Model;Batch size;Device;IterationCount;Threads num;Latency;Total time (s);FPS;'
     file.write(head + '\n')
     file.close()
 
-def write_row(filename, net_name, number_iter, batch_size, thread_num, average_time, latency, fps):
+def write_row(filename, net_name, number_iter, batch_size, thread_num, latency, total_time, fps):
     row = '{0};{1};CPU;{2};{3};{4:.3f};{5:.3f};{6:.3f}'.format(
             net_name, batch_size, number_iter, thread_num,
-           average_time, latency, fps)
+            latency, total_time, fps)
     file = open(filename, 'a')
     file.write(row + '\n')
     file.close()
@@ -234,20 +235,20 @@ def main():
                                 ['CPU'], '', args.thread_num)
     net.batch_size = args.batch_size
     exec_net = plugin.load(network=net)
-    
+
     # Execute network
-    pred, inference_time = openvino_benchmark_sync(exec_net, net, args.number_iter,
-                                     args.batch_size, args.input_folder, args.output,
-                                     args.output_folder, args.task_type)
+    pred, inference_times, inference_total_time = openvino_benchmark_sync(
+            exec_net, net, args.number_iter, args.batch_size, args.input_folder, 
+            args.output, args.output_folder, args.task_type)
     
     # Write benchmark results
-    inference_time = three_sigma_rule(inference_time)
-    average_time = calculate_average_time(inference_time)
-    latency = calculate_latency(inference_time)
+    inference_times = three_sigma_rule(inference_times)
+    latency = calculate_latency(inference_times)
     
-    fps = calculate_fps(args.batch_size, latency)
+    fps = calculate_fps(args.number_iter, inference_total_time)
+    
     write_row(args.result_file, os.path.basename(args.model), args.number_iter, 
-              args.batch_size, args.thread_num, average_time, latency, fps)
+              args.batch_size, args.thread_num, latency, inference_total_time, fps)
     
     del exec_net
     del net
