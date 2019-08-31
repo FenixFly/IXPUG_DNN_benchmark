@@ -56,29 +56,39 @@ def build_argparser():
 def load_network(model, config):
     net = cv2.dnn.readNet(model, config)
     return net
-    
+
+def load_images(w, h, input_folder, numbers):
+    data = os.listdir(input_folder)
+    counts = numbers
+    if len(data)<numbers:
+        counts = len(data)
+    images = []
+    for i in range(counts):
+        image = cv2.imread(os.path.join(input_folder, data[i]))
+        image = cv2.resize(image, (w, h))
+        images.append(image)
+        del image
+    return images, counts
+
 def opencv_benchmark(net, number_iter, input_folder, 
                     need_output = False, output_folder = '', task_type = '', 
                     blob_size = (224,224), blob_scale = 1.0, batch_size = 1):
     
     filenames = os.listdir(input_folder)
-    filenames_size = len(filenames)
     inference_time = []
     
     number_iter = (number_iter + batch_size - 1) // batch_size
+    images, counts = load_images(blob_size[0], blob_size[1], input_folder, number_iter * batch_size)
+    
+    t0_total = time()
     for i in range(number_iter):
-        
         if batch_size > 1:
-            images = []
-            for j in range(batch_size):
-                image_name = os.path.join(input_folder, filenames[(i * batch_size + j) % filenames_size])
-                image = cv2.imread(image_name)
-                images.append(image)
-            blob = cv2.dnn.blobFromImages(images, blob_scale, blob_size, (0, 0, 0))
+            a = (i * batch_size) % len(images) 
+            b = (((i + 1) * batch_size - 1) % len(images)) + 1
+            im_batch = images[a : b]
+            blob = cv2.dnn.blobFromImages(im_batch, blob_scale, blob_size, (0, 0, 0))
         else:
-            image_name = os.path.join(input_folder, filenames[i % filenames_size])
-            image = cv2.imread(image_name)
-            blob = cv2.dnn.blobFromImage(image, blob_scale, blob_size, (0, 0, 0))
+            blob = cv2.dnn.blobFromImage(images[i], blob_scale, blob_size, (0, 0, 0))
         
         net.setInput(blob)
         
@@ -100,7 +110,9 @@ def opencv_benchmark(net, number_iter, input_folder,
                     detection_output(preds, output_filename)
                 
         inference_time.append(t1 - t0)
-    return preds, inference_time
+    t1_total = time()
+    inference_total_time = t1_total - t0_total
+    return preds, inference_time, inference_total_time
 
 def classification_output(prob, output_file):
     prob = prob[0]
@@ -121,10 +133,6 @@ def three_sigma_rule(time):
             valid_time.append(time[i])
     return valid_time
 
-def calculate_average_time(time):
-    average_time = np.mean(time)
-    return average_time
-
 def calculate_latency(time):
     time.sort()
     latency = np.median(time)
@@ -137,13 +145,13 @@ def create_result_file(filename):
     if os.path.isfile(filename):
         return
     file = open(filename, 'w')
-    head = 'Model;Batch size;Device;IterationCount;Average time of single pass (s);Latency;FPS;'
+    head = 'Model;Batch size;Device;IterationCount;Latency;Total time (s);FPS;'
     file.write(head + '\n')
     file.close()
 
-def write_row(filename, net_name, number_iter, batch_size, average_time, latency, fps):
+def write_row(filename, net_name, number_iter, batch_size, latency, total_time, fps):
     row = '{};{};CPU;{};{:.3f};{:.3f};{:.3f}'.format(net_name, batch_size, number_iter, 
-           average_time, latency, fps)
+           latency, total_time, fps)
     file = open(filename, 'a')
     file.write(row + '\n')
     file.close()
@@ -157,18 +165,17 @@ def main():
     net = load_network(args.model, args.proto)
     
     # Execute network
-    pred, inference_time = opencv_benchmark(net, args.number_iter,
+    pred, inference_times, total_time = opencv_benchmark(net, args.number_iter,
                                      args.input_folder, args.output,
                                      args.output_folder,args.task_type,
                                      (args.width, args.height), args.scale, args.batch_size)
     
     # Write benchmark results
-    inference_time = three_sigma_rule(inference_time)
-    average_time = calculate_average_time(inference_time)
-    latency = calculate_latency(inference_time)
-    fps = calculate_fps(args.batch_size, latency)
+    inference_times = three_sigma_rule(inference_times)
+    latency = calculate_latency(inference_times)
+    fps = calculate_fps(args.number_iter, total_time)
     write_row(args.result_file, os.path.basename(args.model), args.number_iter, 
-              args.batch_size, average_time, latency, fps)
+              args.batch_size, latency, total_time, fps)
 
 if __name__ == '__main__':
     main()
