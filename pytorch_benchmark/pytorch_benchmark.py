@@ -10,10 +10,10 @@ cd IXPUG_DNN_benchmark/pytorch_benchmark
 mkdir results_classification
 mkdir results_detection
 python3 pytorch_benchmark.py -t classification -i ../datasets/imagenet/ -m ../models/resnet-50.pth -ni 1000 -o False -of ./results_classification/ -r ./results_classification/result.csv -w 224 -he 224 -b 1
-python3 tf_benchmark.py -t detection -i ../datasets/pascal_voc/ -m ../models/ssd300.pth -ni 1000 -o False -of ./results_detection/ -r ./results_detection/result.csv -w 224 -h 224 -b 1
+python3 pytorch_benchmark.py -t ssd300 -i ../datasets/pascal_voc/ -m ../models/ssd300.pth -ni 1000 -o False -of ./results_detection/ -r ./results_detection/result.csv -w 300 -he 300 -b 1
 
 PyTorch realization of ResNet-50 was used from: https://pytorch.org/hub/pytorch_vision_resnet/
-
+PyTorch realization of SSD300 was used from: https://github.com/amdegroot/ssd.pytorch
 
 Created 07.10.2019
 
@@ -31,7 +31,7 @@ from time import time
 
 def build_argparser():
     parser=argparse.ArgumentParser()
-    parser.add_argument('-m', '--model', help='Path to an TensorFlow .pb model\
+    parser.add_argument('-m', '--model', help='Path to an PyTorch .pth model\
         with a trained weights.', required=True, type=str)
     parser.add_argument('-i', '--input_folder', help='Name of input folder',
         default='', type=str)
@@ -96,11 +96,18 @@ def write_row(filename, net_name, batch_size, number_iter, latency, total_time, 
     file.write(row + '\n')
     file.close()
 
-def load_network(model, width, height):
+def load_network(model, width, height, task_type = 'classification'):
     
-    device = torch.device('cpu')
-    net = torch.load(model, map_location=torch.device('cpu'))
-    net.eval()
+    if task_type == 'ssd300':
+        import sys
+        sys.path.append('ssd300')
+        from ssd import build_ssd
+        net = build_ssd('test', 300, 21)    # initialize SSD
+        net.load_weights(model)
+    else:
+        device = torch.device('cpu')
+        net = torch.load(model, map_location=torch.device('cpu'))
+        net.eval()
     
     return net
 
@@ -112,8 +119,7 @@ def load_images(w, h, input_folder, numbers):
     images = []
     
     preprocess = transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(w),
+            transforms.Resize((w,h)),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ])
@@ -166,7 +172,7 @@ def main():
     create_result_file(args.result_file)
 
     # Load network	
-    net = load_network(args.model, args.width, args.height)
+    net = load_network(args.model, args.width, args.height, args.task_type)
     
     # Execute network
     inference_time, total_time = pytorch_benchmark(net, 
