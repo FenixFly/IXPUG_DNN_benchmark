@@ -115,26 +115,22 @@ def load_network(model, width, height, task_type = 'classification'):
         # Build ssd300 model
         isess = tf.InteractiveSession()
 
-        net_shape=(300, 300)
-        data_forma = 'NHWC'
-        input_tensor = tf.placeholder(tf.uint8, shape=(None, None, 3))
-        # Evaluation pre-processing: resize to SSD net shape.
-        image_pre, labels_pre, bboxes_pre, bbox_img = ssd_vgg_preprocessing.preprocess_for_eval(
-            input_tensor, None, None, net_shape, data_forma, resize=ssd_vgg_preprocessing.Resize.WARP_RESIZE)
-        image_4d = tf.expand_dims(image_pre, 0)
+        net_shape=(height, width)
+        input_tensor = tf.placeholder(tf.float32, shape=(None, height, width, 3))
+        bbox_img = tf.constant([[0., 0., 1., 1.]])
 
         # Define the SSD model.
         reuse = True if 'ssd_net' in locals() else None
         ssd_net = ssd_vgg_300.SSDNet()
-        with slim.arg_scope(ssd_net.arg_scope(data_format=data_forma)):
-            predictions, localisations, _, _ = ssd_net.net(image_4d, is_training=False, reuse=reuse)
+        with slim.arg_scope(ssd_net.arg_scope(data_format='NHWC')):
+            predictions, localisations, _, _ = ssd_net.net(input_tensor, is_training=False, reuse=reuse)
 
         # Restore SSD model.
         isess.run(tf.global_variables_initializer())
         saver = tf.train.Saver()
         saver.restore(isess, model)
         
-        return isess, ssd_net, image_4d
+        return isess, (ssd_net, predictions, localisations, bbox_img), input_tensor
     else:
         graph = tf.Graph()
         sess = tf.InteractiveSession(graph = graph)
@@ -150,7 +146,7 @@ def load_network(model, width, height, task_type = 'classification'):
             
     return sess, graph, input_tensor
 
-def load_images(w, h, input_folder, numbers):
+def load_images(w, h, input_folder, numbers, mean = [0, 0, 0]):
     data = os.listdir(input_folder)
     counts = numbers
     if len(data)<numbers:
@@ -165,47 +161,34 @@ def load_images(w, h, input_folder, numbers):
 
 def tf_benchmark(sess, graph, input_tensor, width, height, number_iter, 
                  input_folder, need_output = False, output_folder = '', 
-                 task_type = '', batch_size = 1):
+                 task_type = '', batch_size = 1, mean = [0, 0, 0]):
     filenames = os.listdir(input_folder)
     inference_times = []
     number_iter = (number_iter + batch_size - 1) // batch_size
-    images, counts = load_images(width, height, input_folder, number_iter * batch_size)
+    images, counts = load_images(width, height, input_folder, number_iter * batch_size, mean)
  
     if (task_type == 'ssd300'):
-        slim = tf.contrib.slim
-        import sys
-        sys.path.append('ssd300')
-        import ssd_vgg_300
-        import ssd_vgg_preprocessing
-        net_shape=(300, 300)
-        data_forma = 'NHWC'
-        input_tensor = tf.placeholder(tf.uint8, shape=(None, None, 3))
-        image_pre, labels_pre, bboxes_pre, bbox_img = ssd_vgg_preprocessing.preprocess_for_eval(
-            input_tensor, None, None, net_shape, data_forma, resize=ssd_vgg_preprocessing.Resize.WARP_RESIZE)
-        image_4d = tf.expand_dims(image_pre, 0)
-        with slim.arg_scope(graph.arg_scope(data_format=data_forma)):
-            predictions, localisations, _, _ = graph.net(image_4d, is_training=False, reuse=True)
+        images = np.array(images).astype(np.float32)
+        ssd_net = graph[0]
+        predictions = graph[1]
+        localisations = graph[2]
+        bbox_img = graph[3]
     else:
         output_tensor = graph.get_tensor_by_name("import/predict:0")
     
     #Warmup
-    if (task_type == 'ssd300'):
-        blob = np.array(images[0])
+    blob = np.array(images[0:batch_size])
+    if (task_type == 'ssd300'):   
         rimg, rpredictions, rlocalisations, rbbox_img = sess.run([input_tensor, predictions, localisations, bbox_img], feed_dict = {input_tensor: blob})
     else:
-        blob = np.array(images[0:batch_size])
         output = sess.run(output_tensor, feed_dict = {input_tensor: blob})
-    
     
     t0_total = time()
     for i in range(number_iter):
         a = (i * batch_size) % len(images) 
         b = (((i + 1) * batch_size - 1) % len(images)) + 1
         
-        if (task_type == 'ssd300'):
-            blob = np.array(images[a])
-        else:
-            blob = np.array(images[a:b])
+        blob = np.array(images[a:b])
             
         t0 = time()
         
@@ -238,7 +221,7 @@ def main():
     # Execute network
     inference_time, total_time = tf_benchmark(sess, graph, input_tensor, 
         args.width, args.height, args.number_iter, args.input_folder, args.output, args.output_folder, 
-        args.task_type, args.batch_size)
+        args.task_type, args.batch_size, args.mean)
 
     # Write benchmark results
     inference_time = three_sigma_rule(inference_time)
