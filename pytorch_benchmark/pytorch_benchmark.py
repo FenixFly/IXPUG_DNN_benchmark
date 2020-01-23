@@ -28,6 +28,7 @@ import os.path
 import argparse
 import numpy as np
 from time import time
+from torch.utils import mkldnn as mkldnn_utils
 
 def build_argparser():
     parser=argparse.ArgumentParser()
@@ -53,6 +54,8 @@ def build_argparser():
         required=True, type=int)
     parser.add_argument('-he', '--height', help='Input tensor height', 
         required=True, type=int)
+    parser.add_argument('-nt', '--number_treads', help='Number of inference \
+        iterations', default = 0, type=int)
     return parser
 	
 def three_sigma_rule(time):
@@ -140,18 +143,23 @@ def pytorch_benchmark(net, width, height, number_iter,
     number_iter = (number_iter + batch_size - 1) // batch_size
     images, counts = load_images(width, height, input_folder, number_iter * batch_size)
     
+    net = mkldnn_utils.to_mkldnn(net)
+
     t0_total = time()
     for i in range(number_iter):
         a = (i * batch_size) % len(images) 
         b = (((i + 1) * batch_size - 1) % len(images)) + 1
         
         blob = images[a:b]
+        blob = blob.to_mkldnn()
         
         t0 = time()
         
         output = net(blob)
         
         t1 = time()
+
+        output = output.to_dense()
     
         if (need_output == True and batch_size == 1):
             # Generate output name
@@ -171,13 +179,18 @@ def main():
     args = build_argparser().parse_args()
     create_result_file(args.result_file)
 
+    # Set number of threads
+    if args.number_treads > 0:
+        torch.set_num_threads(args.number_treads)
+    
     # Load network	
     net = load_network(args.model, args.width, args.height, args.task_type)
     
     # Execute network
-    inference_time, total_time = pytorch_benchmark(net, 
-        args.width, args.height, args.number_iter, args.input_folder, args.output, args.output_folder, 
-        args.task_type, args.batch_size)
+    with torch.no_grad():
+        inference_time, total_time = pytorch_benchmark(net, 
+            args.width, args.height, args.number_iter, args.input_folder, args.output, args.output_folder, 
+            args.task_type, args.batch_size)
 
     # Write benchmark results
     inference_time = three_sigma_rule(inference_time)
